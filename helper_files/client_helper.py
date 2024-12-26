@@ -6,7 +6,8 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 from alpaca.data.historical.stock import StockHistoricalDataClient
-from alpaca.data.requests import StockBarsRequest,StockLatestBarRequest
+from alpaca.data.historical.crypto import CryptoHistoricalDataClient
+from alpaca.data.requests import StockBarsRequest,StockLatestBarRequest,CryptoBarsRequest
 import logging
 #import yfinance as yf
 
@@ -134,6 +135,13 @@ def get_ndaq_tickers(mongo_url, FINANCIAL_PREP_API_KEY):
     mongo_client.close()
     return tickers
 
+def get_crypto_tickers():
+    return ["AAVE/USD", "AVAX/USD", "BAT/USD", "BCH/USD", "BTC/USD",
+            "CRV/USD", "DOGE/USD", "DOT/USD", "ETH/USD", "GRT/USD",
+            "LINK/USD", "LTC/USD", "MKR/USD", "SHIB/USD", "SUSHI/USD",
+            "UNI/USD", "USDC/USD", "USDT/USD", "XTZ/USD", "YFI/USD"]
+
+
 # Market status checker helper
 def market_status(polygon_client):
     """
@@ -165,6 +173,22 @@ def get_latest_price(ticker,stock_client:StockHistoricalDataClient):
    try:  
         sbr=StockBarsRequest(symbol_or_symbols=[ticker],timeframe=TimeFrame.Day,start=datetime(2023,1,1))
         bars=stock_client.get_stock_bars(sbr)
+        alpaca_data=bars.df
+        return round(alpaca_data['close'].iloc[-1], 2)
+   except Exception as e:  
+      logging.error(f"Error fetching latest price for {ticker}: {e}")  
+      return None
+  
+def get_latest_crypto_price(ticker,stock_client:CryptoHistoricalDataClient):  
+   """  
+   Fetch the latest price for a given stock ticker using yfinance.  
+  
+   :param ticker: The stock ticker symbol  
+   :return: The latest price of the stock  
+   """  
+   try:  
+        sbr=CryptoBarsRequest(symbol_or_symbols=[ticker],timeframe=TimeFrame.Day,start=datetime(2023,1,1))
+        bars=stock_client.get_crypto_bars(sbr)
         alpaca_data=bars.df
         return round(alpaca_data['close'].iloc[-1], 2)
    except Exception as e:  

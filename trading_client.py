@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 from pymongo import MongoClient
 import time
 from datetime import datetime, timedelta
-from helper_files.client_helper import place_order, get_ndaq_tickers, market_status, strategies, get_latest_price, dynamic_period_selector
+from helper_files.client_helper import place_order, get_ndaq_tickers, market_status, strategies, get_latest_price, dynamic_period_selector, get_crypto_tickers, get_latest_crypto_price
 from alpaca.trading.client import TradingClient
 from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 from alpaca.data.historical.stock import StockHistoricalDataClient
@@ -77,12 +77,13 @@ def main():
     """
     Main function to control the workflow based on the market's status.
     """
-    ndaq_tickers = []
+    crypto_tickers = []
     early_hour_first_iteration = True
     post_hour_first_iteration = True
     client = RESTClient(api_key=POLYGON_API_KEY)
     trading_client = TradingClient(API_KEY, API_SECRET)
     stock_client = StockHistoricalDataClient(API_KEY, API_SECRET)
+    crypto_client = CryptoHistoricalDataClient(API_KEY, API_SECRET)
     mongo_client = MongoClient(mongo_url)
     db = mongo_client.trades
     asset_collection = db.assets_quantities
@@ -91,6 +92,7 @@ def main():
         client = RESTClient(api_key=POLYGON_API_KEY)
         trading_client = TradingClient(API_KEY, API_SECRET)
         status = market_status(client)  # Use the helper function for market status
+        status="open"
         db = mongo_client.trades
         asset_collection = db.assets_quantities
         market_db = mongo_client.market_data
@@ -101,8 +103,8 @@ def main():
         
         if status == "open":
             logging.info("Market is open. Waiting for 60 seconds.")
-            if not ndaq_tickers:
-                ndaq_tickers = get_ndaq_tickers(mongo_url, FINANCIAL_PREP_API_KEY)  # Fetch tickers using the helper function
+            if not crypto_tickers:
+                crypto_tickers = get_crypto_tickers()  # Fetch tickers using the helper function
                 sim_db = mongo_client.trading_simulator
                 rank_collection = sim_db.rank
                 r_t_c_collection = sim_db.rank_to_coefficient
@@ -117,7 +119,7 @@ def main():
             spy_latest = get_latest_price('SPY',stock_client)
             
             buy_heap = []
-            for ticker in ndaq_tickers:
+            for ticker in crypto_tickers:
                 decisions_and_quantities = []
                 try:
                     trading_client = TradingClient(API_KEY, API_SECRET)
@@ -144,7 +146,7 @@ def main():
                         try:
                             
 
-                            historical_data = get_data(ticker)
+                            historical_data = get_crypto_data(ticker,crypto_client)
                         except:
                             print(f"Error fetching data for {ticker}. Retrying...")
                     
@@ -152,7 +154,7 @@ def main():
                     current_price = None
                     while current_price is None:
                         try:
-                            current_price = get_latest_price(ticker,stock_client)
+                            current_price = get_latest_crypto_price(ticker,crypto_client)
                         except:
                             print(f"Error fetching price for {ticker}. Retrying...")
                             time.sleep(10)

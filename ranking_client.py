@@ -11,6 +11,8 @@ import alpaca
 from alpaca.trading.client import TradingClient
 from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 from alpaca.data.historical.stock import StockHistoricalDataClient
+from alpaca.data.historical.crypto import CryptoHistoricalDataClient
+from alpaca.data.requests import StockBarsRequest,StockLatestBarRequest,CryptoBarsRequest
 from alpaca.trading.stream import TradingStream
 from alpaca.data.live.stock import StockDataStream
 from alpaca.data.requests import (
@@ -46,7 +48,7 @@ import yfinance as yf
 import logging
 from collections import Counter
 from trading_client import market_status
-from helper_files.client_helper import strategies, get_latest_price, get_ndaq_tickers, dynamic_period_selector
+from helper_files.client_helper import strategies, get_latest_price, get_ndaq_tickers, dynamic_period_selector, get_crypto_tickers, get_latest_crypto_price
 import time
 from datetime import datetime 
 import heapq 
@@ -62,21 +64,20 @@ logging.basicConfig(
     ]
 )
 
-def process_ticker(ticker, mongo_client,stock_client):
+def process_ticker(ticker, mongo_client,crypto_client):
    try:
       
       current_price = None
       historical_data = None
       while current_price is None:
          try:
-            current_price = get_latest_price(ticker,stock_client)
+            current_price = get_latest_crypto_price(ticker,crypto_client)
          except Exception as fetch_error:
             logging.warning(f"Error fetching price for {ticker}. Retrying... {fetch_error}")
             time.sleep(10)
       while historical_data is None:
          try:
-            stock_client=StockHistoricalDataClient(api_key=API_KEY,secret_key=API_SECRET)
-            historical_data = get_data(ticker,stock_client)
+            historical_data = get_crypto_data(ticker,crypto_client)
          except Exception as fetch_error:
             logging.warning(f"Error fetching historical data for {ticker}. Retrying... {fetch_error}")
             time.sleep(10)
@@ -252,7 +253,7 @@ def update_portfolio_values(client):
    still need to implement.
    we go through each strategy and update portfolio value buy cash + summation(holding * current price)
    """
-   stock_client = StockHistoricalDataClient(API_KEY, API_SECRET)
+   crypto_client = CryptoHistoricalDataClient(API_KEY, API_SECRET)
    db = client.trading_simulator  
    holdings_collection = db.algorithm_holdings
    # Update portfolio values
@@ -266,7 +267,7 @@ def update_portfolio_values(client):
           current_price = None
           while current_price is None:
             try:
-               current_price = get_latest_price(ticker,stock_client)
+               current_price = get_latest_crypto_price(ticker,crypto_client)
             except:
                print(f"Error fetching price for {ticker}. Retrying...")
           print(f"Current price of {ticker}: {current_price}")
@@ -319,26 +320,27 @@ def main():
    """  
    Main function to control the workflow based on the market's status.  
    """  
-   ndaq_tickers = []  
+   crypto_tickers = []  
    early_hour_first_iteration = True
    post_market_hour_first_iteration = True
    
    
    while True: 
       mongo_client = MongoClient(mongo_url, tlsCAFile=ca)
-      stock_client=StockHistoricalDataClient(api_key=API_KEY,secret_key=API_SECRET)
+      crypto_client=CryptoHistoricalDataClient(api_key=API_KEY,secret_key=API_SECRET)
       status = mongo_client.market_data.market_status.find_one({})["market_status"]
 
+      status="open"
       
       if status == "open":  
          logging.info("Market is open. Processing strategies.")  
-         if not ndaq_tickers:
-            ndaq_tickers = get_ndaq_tickers(mongo_url, FINANCIAL_PREP_API_KEY)
+         if not crypto_tickers:
+            crypto_tickers = get_crypto_tickers()
 
          threads = []
 
-         for ticker in ndaq_tickers:
-            thread = threading.Thread(target=process_ticker, args=(ticker, mongo_client,stock_client))
+         for ticker in crypto_tickers:
+            thread = threading.Thread(target=process_ticker, args=(ticker, mongo_client,crypto_client))
             threads.append(thread)
             thread.start()
 
@@ -355,7 +357,7 @@ def main():
       elif status == "early_hours":  
             if early_hour_first_iteration is True:  
                
-               ndaq_tickers = get_ndaq_tickers(mongo_url, FINANCIAL_PREP_API_KEY)  
+               crypto_tickers = get_crypto_tickers()  
                early_hour_first_iteration = False  
                post_market_hour_first_iteration = True
             logging.info("Market is in early hours. Waiting for 60 seconds.")  

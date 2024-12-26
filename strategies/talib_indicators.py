@@ -6,6 +6,8 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from alpaca.data.timeframe import TimeFrame
 from alpaca.data.historical.stock import StockHistoricalDataClient
+from alpaca.data.historical.crypto import CryptoHistoricalDataClient
+from alpaca.data.requests import StockBarsRequest,StockLatestBarRequest,CryptoBarsRequest
 
 def get_data(ticker,stock_client:StockHistoricalDataClient, period=relativedelta(years=1),tf=TimeFrame.Day): 
 
@@ -14,6 +16,20 @@ def get_data(ticker,stock_client:StockHistoricalDataClient, period=relativedelta
    startdate=datetime.now()-period
    sbr=StockBarsRequest(symbol_or_symbols=[ticker],timeframe=tf,start=startdate)
    bars=stock_client.get_stock_bars(sbr)
+   data=bars.df
+   
+   # Renaming the columns as yf has other column names
+   data=data.rename(columns={'open': 'Open', 'high': 'High', 'low': 'Low', 'close': 'Close', 'volume':'Volume'})
+   
+   return data 
+
+def get_crypto_data(ticker,crypto_client:CryptoHistoricalDataClient, period=relativedelta(years=1),tf=TimeFrame.Day): 
+
+   """Retrieve historical data for a given ticker."""  
+   
+   startdate=datetime.now()-period
+   sbr=StockBarsRequest(symbol_or_symbols=[ticker],timeframe=tf,start=startdate)
+   bars=crypto_client.get_crypto_bars(sbr)
    data=bars.df
    
    # Renaming the columns as yf has other column names
