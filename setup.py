@@ -6,6 +6,7 @@ import math
 import yfinance as yf
 from helper_files.client_helper import get_latest_price
 from alpaca.trading.client import TradingClient
+from alpaca.data.historical.stock import StockHistoricalDataClient
 
 def insert_rank_to_coefficient(i):
    try:
@@ -101,6 +102,7 @@ def initialize_market_setup():
 def initialize_portfolio_percentages():
    try:
       client = MongoClient(mongo_url)
+      stock_client = StockHistoricalDataClient(API_KEY, API_SECRET)
       trading_client = TradingClient(API_KEY, API_SECRET)
       account = trading_client.get_account()
       db = client.trades
@@ -112,11 +114,11 @@ def initialize_portfolio_percentages():
       })
       collection.insert_one({
          "name" : "ndaq_percentage",
-         "portfolio_value": (get_latest_price('QQQ')-503.17)/503.17,
+         "portfolio_value": (get_latest_price('QQQ',stock_client)-503.17)/503.17,
       })
       collection.insert_one({
          "name" : "spy_percentage",
-         "portfolio_value": (get_latest_price('SPY')-590.50)/590.50,
+         "portfolio_value": (get_latest_price('SPY',stock_client)-590.50)/590.50,
       })
       client.close()
       print("Successfully initialized portfolio percentages")
