@@ -1,13 +1,24 @@
 import yfinance as yf  
 import talib as ta 
 import numpy as np
+from alpaca.data.requests import StockBarsRequest
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
+from alpaca.data.timeframe import TimeFrame
+from alpaca.data.historical.stock import StockHistoricalDataClient
 
-def get_data(ticker, period='1y'): 
+def get_data(ticker,stock_client:StockHistoricalDataClient, period=relativedelta(years=1),tf=TimeFrame.Day): 
 
    """Retrieve historical data for a given ticker."""  
    
-   ticker = yf.Ticker(ticker)
-   data = ticker.history(period=period)
+   startdate=datetime.now()-period
+   sbr=StockBarsRequest(symbol_or_symbols=[ticker],timeframe=tf,start=startdate)
+   bars=stock_client.get_stock_bars(sbr)
+   data=bars.df
+   
+   # Renaming the columns as yf has other column names
+   data=data.rename(columns={'open': 'Open', 'high': 'High', 'low': 'Low', 'close': 'Close', 'volume':'Volume'})
+   
    return data  
   
 def simulate_strategy(strategy, ticker, current_price, historical_data, account_cash, portfolio_qty, total_portfolio_value):
