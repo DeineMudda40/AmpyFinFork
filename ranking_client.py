@@ -62,21 +62,21 @@ logging.basicConfig(
     ]
 )
 
-def process_ticker(ticker, mongo_client):
+def process_ticker(ticker, mongo_client,stock_client):
    try:
       
       current_price = None
       historical_data = None
       while current_price is None:
          try:
-            current_price = get_latest_price(ticker)
+            current_price = get_latest_price(ticker,stock_client)
          except Exception as fetch_error:
             logging.warning(f"Error fetching price for {ticker}. Retrying... {fetch_error}")
             time.sleep(10)
       while historical_data is None:
          try:
-            
-            historical_data = get_data(ticker)
+            stock_client=StockHistoricalDataClient(api_key=API_KEY,secret_key=API_SECRET)
+            historical_data = get_data(ticker,stock_client)
          except Exception as fetch_error:
             logging.warning(f"Error fetching historical data for {ticker}. Retrying... {fetch_error}")
             time.sleep(10)
@@ -252,7 +252,7 @@ def update_portfolio_values(client):
    still need to implement.
    we go through each strategy and update portfolio value buy cash + summation(holding * current price)
    """
-   
+   stock_client = StockHistoricalDataClient(API_KEY, API_SECRET)
    db = client.trading_simulator  
    holdings_collection = db.algorithm_holdings
    # Update portfolio values
@@ -266,7 +266,7 @@ def update_portfolio_values(client):
           current_price = None
           while current_price is None:
             try:
-               current_price = get_latest_price(ticker)
+               current_price = get_latest_price(ticker,stock_client)
             except:
                print(f"Error fetching price for {ticker}. Retrying...")
           print(f"Current price of {ticker}: {current_price}")
@@ -326,8 +326,9 @@ def main():
    
    while True: 
       mongo_client = MongoClient(mongo_url, tlsCAFile=ca)
+      stock_client=StockHistoricalDataClient(api_key=API_KEY,secret_key=API_SECRET)
       status = mongo_client.market_data.market_status.find_one({})["market_status"]
-      
+
       
       if status == "open":  
          logging.info("Market is open. Processing strategies.")  
@@ -337,7 +338,7 @@ def main():
          threads = []
 
          for ticker in ndaq_tickers:
-            thread = threading.Thread(target=process_ticker, args=(ticker, mongo_client))
+            thread = threading.Thread(target=process_ticker, args=(ticker, mongo_client,stock_client))
             threads.append(thread)
             thread.start()
 

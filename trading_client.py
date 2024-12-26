@@ -82,7 +82,7 @@ def main():
     post_hour_first_iteration = True
     client = RESTClient(api_key=POLYGON_API_KEY)
     trading_client = TradingClient(API_KEY, API_SECRET)
-    data_client = StockHistoricalDataClient(API_KEY, API_SECRET)
+    stock_client = StockHistoricalDataClient(API_KEY, API_SECRET)
     mongo_client = MongoClient(mongo_url)
     db = mongo_client.trades
     asset_collection = db.assets_quantities
@@ -90,7 +90,6 @@ def main():
     while True:
         client = RESTClient(api_key=POLYGON_API_KEY)
         trading_client = TradingClient(API_KEY, API_SECRET)
-        data_client = StockHistoricalDataClient(API_KEY, API_SECRET)
         status = market_status(client)  # Use the helper function for market status
         db = mongo_client.trades
         asset_collection = db.assets_quantities
@@ -114,8 +113,8 @@ def main():
                     early_hour_first_iteration = False
                     post_hour_first_iteration = True
             account = trading_client.get_account()
-            qqq_latest = get_latest_price('QQQ')
-            spy_latest = get_latest_price('SPY')
+            qqq_latest = get_latest_price('QQQ',stock_client)
+            spy_latest = get_latest_price('SPY',stock_client)
             
             buy_heap = []
             for ticker in ndaq_tickers:
@@ -153,7 +152,7 @@ def main():
                     current_price = None
                     while current_price is None:
                         try:
-                            current_price = get_latest_price(ticker)
+                            current_price = get_latest_price(ticker,stock_client)
                         except:
                             print(f"Error fetching price for {ticker}. Retrying...")
                             time.sleep(10)
