@@ -31,7 +31,7 @@ def connect_to_mongo(mongo_url):
     return MongoClient(mongo_url)
 
 # Helper to place an order
-def place_order(trading_client, symbol, side, quantity, mongo_client):
+def place_order(trading_client, symbol, side, qty, mongo_url):
     """
     Place a market order and log the order to MongoDB.
 
@@ -42,17 +42,16 @@ def place_order(trading_client, symbol, side, quantity, mongo_client):
     :param mongo_url: MongoDB connection URL
     :return: Order result from Alpaca API
     """
-    
     market_order_data = MarketOrderRequest(
         symbol=symbol,
-        qty=quantity,
+        qty=qty,
         side=side,
         time_in_force=TimeInForce.DAY
     )
     order = trading_client.submit_order(market_order_data)
-    qty = round(quantity, 3)
+    qty = round(qty, 3)
     # Log trade details to MongoDB
-    
+    mongo_client = connect_to_mongo(mongo_url)
     db = mongo_client.trades
     db.paper.insert_one({
         'symbol': symbol,
@@ -74,11 +73,11 @@ def place_order(trading_client, symbol, side, quantity, mongo_client):
         if assets.find_one({'symbol': symbol})['quantity'] == 0:
             assets.delete_one({'symbol': symbol})
 
-       
+    mongo_client.close()    
     return order
 
 # Helper to retrieve NASDAQ-100 tickers from MongoDB
-def get_ndaq_tickers(mongo_client, FINANCIAL_PREP_API_KEY):
+def get_ndaq_tickers(mongo_url, FINANCIAL_PREP_API_KEY):
     """
     Connects to MongoDB and retrieves NASDAQ-100 tickers.
 
@@ -112,7 +111,7 @@ def get_ndaq_tickers(mongo_client, FINANCIAL_PREP_API_KEY):
             return
         try:
             # MongoDB connection details
-            
+            mongo_client = MongoClient(mongo_url)
             db = mongo_client.stock_list
             ndaq100_tickers = db.ndaq100_tickers
 
@@ -121,12 +120,14 @@ def get_ndaq_tickers(mongo_client, FINANCIAL_PREP_API_KEY):
             logging.info("Successfully inserted NASDAQ 100 tickers into MongoDB.")
         except Exception as e:
             logging.error(f"Error inserting tickers into MongoDB: {e}")
-        
+        finally:
+            mongo_client.close()
+            logging.info("MongoDB connection closed.")
 
     call_ndaq_100()
-    
+    mongo_client = connect_to_mongo(mongo_url) 
     tickers = [stock['symbol'] for stock in mongo_client.stock_list.ndaq100_tickers.find()]
-    
+    mongo_client.close()
     return tickers
 
 # Market status checker helper
