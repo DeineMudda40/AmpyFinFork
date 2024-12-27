@@ -7,7 +7,7 @@ from dateutil.relativedelta import relativedelta
 from alpaca.data.timeframe import TimeFrame
 from alpaca.data.historical.stock import StockHistoricalDataClient
 
-def get_data(ticker,stock_client:StockHistoricalDataClient, period=relativedelta(years=1),tf=TimeFrame.Day): 
+def get_data(ticker,stock_client:StockHistoricalDataClient, period=relativedelta(years=2),tf=TimeFrame.Day): 
 
    """Retrieve historical data for a given ticker."""  
    
@@ -15,11 +15,12 @@ def get_data(ticker,stock_client:StockHistoricalDataClient, period=relativedelta
    sbr=StockBarsRequest(symbol_or_symbols=[ticker],timeframe=tf,start=startdate)
    bars=stock_client.get_stock_bars(sbr)
    data=bars.df
+   data = data.reset_index(level="symbol").drop(columns=["symbol"])
    
    # Renaming the columns as yf has other column names
    data=data.rename(columns={'open': 'Open', 'high': 'High', 'low': 'Low', 'close': 'Close', 'volume':'Volume'})
    
-   return data  
+   return data
   
 def simulate_strategy(strategy, ticker, current_price, historical_data, account_cash, portfolio_qty, total_portfolio_value):
    max_investment = total_portfolio_value * 0.10

@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 from pymongo import MongoClient
 import time
 from datetime import datetime, timedelta
-from helper_files.client_helper import place_order, get_ndaq_tickers, market_status, strategies, get_latest_price, dynamic_period_selector
+from helper_files.client_helper import place_order, get_ndaq_tickers, market_status, strategies, get_latest_price, dynamic_period_selector, parse_time_span, filter_dataframe
 from alpaca.trading.client import TradingClient
 from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 from alpaca.data.historical.stock import StockHistoricalDataClient
@@ -96,8 +96,9 @@ def main():
         market_db = mongo_client.market_data
         market_collection = market_db.market_status
         
+        indicators_db=mongo_client.IndicatorsDatabase
+        indicators=indicators_db.Indicators
         market_collection.update_one({}, {"$set": {"market_status": status}})
-        
         
         if status == "open":
             logging.info("Market is open. Waiting for 60 seconds.")
@@ -144,7 +145,7 @@ def main():
                         try:
                             
 
-                            historical_data = get_data(ticker)
+                            historical_data = get_data(ticker,stock_client)
                         except:
                             print(f"Error fetching data for {ticker}. Retrying...")
                     
@@ -165,8 +166,14 @@ def main():
                     use weight from each strategy to determine how much each decision will be weighed. weights will be in decimal
                     """
                     for strategy in strategies:
+                        try:
+                            ip=indicators.find_one({"indicator":strategy.__name__})["ideal_period"]
+                            cut_data=filter_dataframe(historical_data,ip)
+                        except:
+                            print(f"No timespan for indicator {strategy.__name__} {ip}")
+                            cut_data=historical_data
                         
-                        decision, quantity = simulate_strategy(strategy, ticker, current_price, historical_data,
+                        decision, quantity = simulate_strategy(strategy, ticker, current_price, cut_data,
                                                       buying_power, portfolio_qty, portfolio_value)
                         weight = strategy_to_coefficient[strategy.__name__]
                         

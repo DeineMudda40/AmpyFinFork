@@ -46,7 +46,7 @@ import yfinance as yf
 import logging
 from collections import Counter
 from trading_client import market_status
-from helper_files.client_helper import strategies, get_latest_price, get_ndaq_tickers, dynamic_period_selector
+from helper_files.client_helper import strategies, get_latest_price, get_ndaq_tickers, dynamic_period_selector, filter_dataframe
 import time
 from datetime import datetime 
 import heapq 
@@ -64,7 +64,8 @@ logging.basicConfig(
 
 def process_ticker(ticker, mongo_client,stock_client):
    try:
-      
+      indicators_db=mongo_client.IndicatorsDatabase
+      indicators=indicators_db.Indicators
       current_price = None
       historical_data = None
       while current_price is None:
@@ -77,12 +78,20 @@ def process_ticker(ticker, mongo_client,stock_client):
          try:
             stock_client=StockHistoricalDataClient(api_key=API_KEY,secret_key=API_SECRET)
             historical_data = get_data(ticker,stock_client)
+            
          except Exception as fetch_error:
             logging.warning(f"Error fetching historical data for {ticker}. Retrying... {fetch_error}")
             time.sleep(10)
 
+         
+         
       for strategy in strategies:
-            
+         try:
+            ip=indicators.find_one({"indicator":strategy.__name__})["ideal_period"]
+            cut_data=filter_dataframe(historical_data,ip)
+         except:
+            print(f"No timespan for indicator {strategy.__name__} {ip}")
+            cut_data=historical_data   
          db = mongo_client.trading_simulator  
          holdings_collection = db.algorithm_holdings
          print(f"Processing {strategy.__name__} for {ticker}")
@@ -97,7 +106,7 @@ def process_ticker(ticker, mongo_client,stock_client):
          
          portfolio_qty = strategy_doc["holdings"].get(ticker, {}).get("quantity", 0)
 
-         simulate_trade(ticker, strategy, historical_data, current_price,
+         simulate_trade(ticker, strategy, cut_data, current_price,
                         account_cash, portfolio_qty, total_portfolio_value, mongo_client)
          
       print(f"{ticker} processing completed.")
